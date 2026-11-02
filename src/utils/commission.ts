@@ -1,25 +1,60 @@
 // Commission calculation utility functions
-// Based on comp plan: base $72k, OTE $102k, variable $30k/yr, $2500/mo target, 35pt quota
-// New logic: points 0-35 are $71.43 each, points 35+ are $100 flat per point
+// Q4 comp plan: one tiered rate card for SDR and Sr SDR
+//   0–35 pts: $71.43/pt · 35–50 pts: $83.33/pt · 50+ pts: $115/pt
+// SDR:    $70k base, 35pt quota, $2,500/mo variable at quota, $100k OTE
+// Sr SDR: $80k base, 50pt quota, $3,750/mo variable at quota, $125k OTE
 
-const BASE_POINT_VALUE = 2500 / 35; // ~71.4285714286
-const OVER_QUOTA_POINT_VALUE = 100; // $100 flat per point over quota
-const MONTHLY_BASE_GROSS = 6000;
-const MONTHLY_VARIABLE_TARGET = 2500;
-const MONTHLY_QUOTA_POINTS = 35;
+export type Role = 'sdr' | 'srSdr';
 
-export const CONSTANTS = {
-  BASE_POINT_VALUE,
-  OVER_QUOTA_POINT_VALUE,
-  MONTHLY_BASE_GROSS,
-  MONTHLY_VARIABLE_TARGET,
-  MONTHLY_QUOTA_POINTS,
-} as const;
+export interface RolePlan {
+  label: string;
+  annualBase: number;
+  monthlyBaseGross: number;
+  quotaPoints: number;
+  monthlyVariableTarget: number;
+  ote: number;
+}
+
+export interface RateTier {
+  from: number;
+  to: number;
+  rate: number;
+  label: string;
+}
+
+export const RATE_TIERS: readonly RateTier[] = [
+  { from: 0, to: 35, rate: 2500 / 35, label: '0–35' },
+  { from: 35, to: 50, rate: 1250 / 15, label: '35–50' },
+  { from: 50, to: Infinity, rate: 115, label: '50+' },
+];
+
+export const ROLE_PLANS: Record<Role, RolePlan> = {
+  sdr: {
+    label: 'SDR',
+    annualBase: 70000,
+    monthlyBaseGross: 70000 / 12,
+    quotaPoints: 35,
+    monthlyVariableTarget: 2500,
+    ote: 100000,
+  },
+  srSdr: {
+    label: 'Sr SDR',
+    annualBase: 80000,
+    monthlyBaseGross: 80000 / 12,
+    quotaPoints: 50,
+    monthlyVariableTarget: 3750,
+    ote: 125000,
+  },
+};
+
+export interface TierEarnings {
+  tier: RateTier;
+  points: number;
+  value: number;
+}
 
 export interface TierBreakdown {
-  baseCommission: number;
-  overQuotaPoints: number;
-  overQuotaValue: number;
+  tiers: TierEarnings[];
   totalCommission: number;
 }
 
@@ -29,6 +64,7 @@ export interface TierStatus {
   attainmentPercent: number;
   pointsToNextTier: number;
   nextTierLabel: string;
+  nextPointRate: number;
 }
 
 export interface ScenarioProjection {
@@ -44,73 +80,61 @@ export interface ScenarioProjection {
 }
 
 export function calculateTierBreakdown(points: number): TierBreakdown {
-  if (points <= 0) {
-    return {
-      baseCommission: 0,
-      overQuotaPoints: 0,
-      overQuotaValue: 0,
-      totalCommission: 0,
-    };
-  }
-
-  if (points <= MONTHLY_QUOTA_POINTS) {
-    const commission = points * BASE_POINT_VALUE;
-    return {
-      baseCommission: commission,
-      overQuotaPoints: 0,
-      overQuotaValue: 0,
-      totalCommission: commission,
-    };
-  }
-
-  const baseCommission = MONTHLY_VARIABLE_TARGET;
-  const overQuotaPoints = points - MONTHLY_QUOTA_POINTS;
-  const overQuotaValue = overQuotaPoints * OVER_QUOTA_POINT_VALUE;
-
+  const tiers = RATE_TIERS.map((tier) => {
+    const tierPoints = Math.max(0, Math.min(points, tier.to) - tier.from);
+    return { tier, points: tierPoints, value: tierPoints * tier.rate };
+  });
   return {
-    baseCommission,
-    overQuotaPoints,
-    overQuotaValue,
-    totalCommission: baseCommission + overQuotaValue,
+    tiers,
+    totalCommission: tiers.reduce((sum, t) => sum + t.value, 0),
   };
+}
+
+export function getRateAtPoints(points: number): number {
+  const tier = RATE_TIERS.find((t) => points >= t.from && points < t.to);
+  return (tier ?? RATE_TIERS[RATE_TIERS.length - 1]).rate;
 }
 
 export function calculateCommission(points: number): number {
   return calculateTierBreakdown(points).totalCommission;
 }
 
-export function calculateGrossPay(points: number): number {
-  return MONTHLY_BASE_GROSS + calculateCommission(points);
+export function calculateGrossPay(points: number, role: Role): number {
+  return ROLE_PLANS[role].monthlyBaseGross + calculateCommission(points);
 }
 
-export function calculateAttainmentPercent(points: number): number {
-  return (points / MONTHLY_QUOTA_POINTS) * 100;
+export function calculateAttainmentPercent(points: number, role: Role): number {
+  return (points / ROLE_PLANS[role].quotaPoints) * 100;
 }
 
-export function calculatePointsRemaining(points: number): number {
-  return Math.max(MONTHLY_QUOTA_POINTS - points, 0);
+export function calculatePointsRemaining(points: number, role: Role): number {
+  return Math.max(ROLE_PLANS[role].quotaPoints - points, 0);
 }
 
-export function getCurrentTierStatus(points: number): TierStatus {
-  const attainmentPercent = calculateAttainmentPercent(points);
+export function getCurrentTierStatus(points: number, role: Role): TierStatus {
+  const quota = ROLE_PLANS[role].quotaPoints;
+  const attainmentPercent = calculateAttainmentPercent(points, role);
+  const nextPointRate = getRateAtPoints(points);
 
-  if (points > MONTHLY_QUOTA_POINTS) {
+  if (points > quota) {
     return {
       tier: 'over',
       label: 'Over Quota',
       attainmentPercent,
       pointsToNextTier: 0,
       nextTierLabel: '',
+      nextPointRate,
     };
   }
 
-  if (points === MONTHLY_QUOTA_POINTS) {
+  if (points === quota) {
     return {
       tier: 'quota',
       label: 'At Quota',
       attainmentPercent,
       pointsToNextTier: 0,
       nextTierLabel: 'Over Quota',
+      nextPointRate,
     };
   }
 
@@ -118,20 +142,22 @@ export function getCurrentTierStatus(points: number): TierStatus {
     tier: 'below',
     label: 'Below Quota',
     attainmentPercent,
-    pointsToNextTier: MONTHLY_QUOTA_POINTS - points,
+    pointsToNextTier: quota - points,
     nextTierLabel: 'Quota',
+    nextPointRate,
   };
 }
 
 export function calculateScenarioProjection(
   currentPoints: number,
-  addedPoints: number
+  addedPoints: number,
+  role: Role
 ): ScenarioProjection {
   const projectedPoints = currentPoints + addedPoints;
   const currentCommission = calculateCommission(currentPoints);
   const projectedCommission = calculateCommission(projectedPoints);
-  const currentGross = calculateGrossPay(currentPoints);
-  const projectedGross = calculateGrossPay(projectedPoints);
+  const currentGross = calculateGrossPay(currentPoints, role);
+  const projectedGross = calculateGrossPay(projectedPoints, role);
 
   return {
     currentPoints,

@@ -3,10 +3,11 @@ import { Card } from './Card';
 
 interface PointTrackerProps {
   points: number;
+  quota: number;
   onPointsChange: (points: number) => void;
 }
 
-export function PointTracker({ points, onPointsChange }: PointTrackerProps) {
+export function PointTracker({ points, quota, onPointsChange }: PointTrackerProps) {
   const [showReset, setShowReset] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
   const [showInput, setShowInput] = useState(false);
@@ -15,12 +16,12 @@ export function PointTracker({ points, onPointsChange }: PointTrackerProps) {
   const prevPointsRef = useRef(points);
 
   useEffect(() => {
-    if (points >= 35 && prevPointsRef.current < 35) {
+    if (points >= quota && prevPointsRef.current < quota) {
       setCelebrating(true);
       setTimeout(() => setCelebrating(false), 600);
     }
     prevPointsRef.current = points;
-  }, [points]);
+  }, [points, quota]);
 
   const adjust = (delta: number) => {
     const newVal = Math.max(0, Math.round((points + delta) * 10) / 10);
