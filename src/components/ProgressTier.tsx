@@ -1,8 +1,16 @@
 import { Card, CardTitle } from './Card';
-import { getCurrentTierStatus, formatPercent, CONSTANTS } from '../utils/commission';
+import {
+  getCurrentTierStatus,
+  formatCurrency,
+  formatPercent,
+  RATE_TIERS,
+  ROLE_PLANS,
+  type Role,
+} from '../utils/commission';
 
 interface ProgressTierProps {
   points: number;
+  role: Role;
 }
 
 const TIER_COLORS = {
@@ -11,14 +19,21 @@ const TIER_COLORS = {
   over: { bg: 'bg-emerald-100', text: 'text-emerald-700', badge: 'bg-emerald-500 text-white' },
 };
 
-export function ProgressTier({ points }: ProgressTierProps) {
-  const status = getCurrentTierStatus(points);
+const BAND_COLORS = ['bg-brand-200', 'bg-violet-200', 'bg-emerald-200'];
+const MAX_DISPLAY = 70;
+
+export function ProgressTier({ points, role }: ProgressTierProps) {
+  const quota = ROLE_PLANS[role].quotaPoints;
+  const status = getCurrentTierStatus(points, role);
   const colors = TIER_COLORS[status.tier];
 
-  const maxDisplay = 60;
-  const quotaPct = (CONSTANTS.MONTHLY_QUOTA_POINTS / maxDisplay) * 100;
-  const overQuotaPct = 100 - quotaPct;
-  const fillPct = Math.min((points / maxDisplay) * 100, 100);
+  const bands = RATE_TIERS.map((tier) => ({
+    ...tier,
+    widthPct: ((Math.min(tier.to, MAX_DISPLAY) - tier.from) / MAX_DISPLAY) * 100,
+  }));
+  const quotaPct = (quota / MAX_DISPLAY) * 100;
+  const fillPct = Math.min((points / MAX_DISPLAY) * 100, 100);
+  const nextRate = formatCurrency(status.nextPointRate);
 
   return (
     <Card>
@@ -37,26 +52,35 @@ export function ProgressTier({ points }: ProgressTierProps) {
       {/* Segmented progress bar */}
       <div className="relative mb-3">
         <div className="flex h-4 rounded-full overflow-hidden bg-gray-100">
-          <div className="bg-brand-200 border-r border-white/50" style={{ width: `${quotaPct}%` }} />
-          <div className="bg-emerald-200" style={{ width: `${overQuotaPct}%` }} />
+          {bands.map((band, i) => (
+            <div
+              key={band.label}
+              className={`${BAND_COLORS[i]} ${i < bands.length - 1 ? 'border-r border-white/50' : ''}`}
+              style={{ width: `${band.widthPct}%` }}
+            />
+          ))}
         </div>
         {/* Fill overlay */}
         <div className="absolute top-0 left-0 h-4 rounded-full transition-all duration-500 ease-out"
           style={{
             width: `${fillPct}%`,
-            background: points <= 35
+            background: points <= quota
               ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
               : 'linear-gradient(90deg, #3b82f6, #10b981)',
           }}
         />
         {/* Quota marker */}
-        <div className="absolute top-0 h-4 w-0.5 bg-white/70" style={{ left: `${quotaPct}%` }} />
+        <div className="absolute -top-1 h-6 w-0.5 bg-gray-700/70 rounded" style={{ left: `${quotaPct}%` }} title={`Quota: ${quota} pts`} />
       </div>
 
       {/* Labels under bar */}
       <div className="flex text-[10px] text-gray-400 font-medium mb-4">
-        <div style={{ width: `${quotaPct}%` }} className="text-center">0–35</div>
-        <div style={{ width: `${overQuotaPct}%` }} className="text-center">35+</div>
+        {bands.map((band) => (
+          <div key={band.label} style={{ width: `${band.widthPct}%` }} className="text-center leading-tight">
+            <div>{band.label}</div>
+            <div className="text-gray-500">{formatCurrency(band.rate)}</div>
+          </div>
+        ))}
       </div>
 
       {/* Status text */}
@@ -64,24 +88,24 @@ export function ProgressTier({ points }: ProgressTierProps) {
         {status.tier === 'below' && (
           <>
             <p className="text-gray-600">
-              <span className="font-bold">{status.pointsToNextTier.toFixed(1)}</span> points to quota
+              <span className="font-bold">{status.pointsToNextTier.toFixed(1)}</span> points to quota ({quota} pts)
             </p>
-            <p className="text-gray-400">Keep booking — you've got this!</p>
+            <p className="text-gray-400">Next point earns {nextRate} — keep booking!</p>
           </>
         )}
         {status.tier === 'quota' && (
           <>
             <p className="text-brand-600 font-semibold">You hit quota!</p>
-            <p className="text-gray-400">Every additional point earns $100</p>
+            <p className="text-gray-400">Every additional point earns {nextRate}</p>
           </>
         )}
         {status.tier === 'over' && (
           <>
             <p className={`${colors.text} font-semibold`}>
-              Over quota! Earning $100 per additional point.
+              Over quota! Earning {nextRate} per additional point.
             </p>
             <p className="text-gray-500">
-              <span className="font-bold">{(points - CONSTANTS.MONTHLY_QUOTA_POINTS).toFixed(1)}</span> pts over quota
+              <span className="font-bold">{(points - quota).toFixed(1)}</span> pts over quota
             </p>
           </>
         )}

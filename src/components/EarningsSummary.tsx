@@ -6,18 +6,20 @@ import {
   calculatePointsRemaining,
   formatCurrency,
   formatPercent,
-  CONSTANTS,
+  ROLE_PLANS,
+  type Role,
 } from '../utils/commission';
 
 interface EarningsSummaryProps {
   points: number;
+  role: Role;
 }
 
-export function EarningsSummary({ points }: EarningsSummaryProps) {
+export function EarningsSummary({ points, role }: EarningsSummaryProps) {
   const commission = calculateCommission(points);
-  const grossPay = calculateGrossPay(points);
-  const attainment = calculateAttainmentPercent(points);
-  const remaining = calculatePointsRemaining(points);
+  const grossPay = calculateGrossPay(points, role);
+  const attainment = calculateAttainmentPercent(points, role);
+  const remaining = calculatePointsRemaining(points, role);
 
   return (
     <Card>
@@ -43,7 +45,7 @@ export function EarningsSummary({ points }: EarningsSummaryProps) {
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Base Pay</p>
-            <p className="text-sm font-bold text-gray-700">{formatCurrency(CONSTANTS.MONTHLY_BASE_GROSS)}</p>
+            <p className="text-sm font-bold text-gray-700">{formatCurrency(ROLE_PLANS[role].monthlyBaseGross)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Attainment</p>

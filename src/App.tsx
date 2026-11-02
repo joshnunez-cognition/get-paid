@@ -3,6 +3,8 @@ import { Header } from './components/Header'
 import { PointTracker } from './components/PointTracker'
 import { EarningsSummary } from './components/EarningsSummary'
 import { ProgressTier } from './components/ProgressTier'
+import { RoleToggle } from './components/RoleToggle'
+import { ROLE_PLANS, type Role } from './utils/commission'
 
 function getDefaultMonthLabel(): string {
   const now = new Date()
@@ -11,6 +13,7 @@ function getDefaultMonthLabel(): string {
 
 function App() {
   const [points, setPoints] = useLocalStorage<number>('gp_points', 0)
+  const [role, setRole] = useLocalStorage<Role>('gp_role', 'sdr')
   const [monthLabel, setMonthLabel] = useLocalStorage<string>('gp_month', getDefaultMonthLabel())
 
   return (
@@ -19,9 +22,10 @@ function App() {
         <Header monthLabel={monthLabel} onMonthLabelChange={setMonthLabel} />
 
         <div className="px-4 space-y-4">
-          <EarningsSummary points={points} />
-          <ProgressTier points={points} />
-          <PointTracker points={points} onPointsChange={setPoints} />
+          <RoleToggle role={role} onRoleChange={setRole} />
+          <EarningsSummary points={points} role={role} />
+          <ProgressTier points={points} role={role} />
+          <PointTracker points={points} quota={ROLE_PLANS[role].quotaPoints} onPointsChange={setPoints} />
         </div>
       </div>
     </div>
