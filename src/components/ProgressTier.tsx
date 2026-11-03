@@ -3,6 +3,7 @@ import {
   getCurrentTierStatus,
   formatCurrency,
   formatPercent,
+  MAX_POINTS,
   RATE_TIERS,
   ROLE_PLANS,
   type Role,
@@ -20,19 +21,26 @@ const TIER_COLORS = {
 };
 
 const BAND_COLORS = ['bg-brand-200', 'bg-violet-200', 'bg-emerald-200'];
-const MAX_DISPLAY = 70;
+const LEGEND_COLORS = ['bg-brand-400', 'bg-violet-400', 'bg-emerald-400'];
+const MIN_DISPLAY = 70;
+
+// Bar scale grows with points (10% headroom, rounded up to 10) so it never pins full before MAX_POINTS
+function getDisplayMax(points: number): number {
+  return Math.min(MAX_POINTS, Math.max(MIN_DISPLAY, Math.ceil((points * 1.1) / 10) * 10));
+}
 
 export function ProgressTier({ points, role }: ProgressTierProps) {
   const quota = ROLE_PLANS[role].quotaPoints;
   const status = getCurrentTierStatus(points, role);
   const colors = TIER_COLORS[status.tier];
 
+  const displayMax = getDisplayMax(points);
   const bands = RATE_TIERS.map((tier) => ({
     ...tier,
-    widthPct: ((Math.min(tier.to, MAX_DISPLAY) - tier.from) / MAX_DISPLAY) * 100,
+    widthPct: ((Math.min(tier.to, displayMax) - tier.from) / displayMax) * 100,
   }));
-  const quotaPct = (quota / MAX_DISPLAY) * 100;
-  const fillPct = Math.min((points / MAX_DISPLAY) * 100, 100);
+  const quotaPct = (quota / displayMax) * 100;
+  const fillPct = Math.min((points / displayMax) * 100, 100);
   const nextRate = formatCurrency(status.nextPointRate);
 
   return (
@@ -73,12 +81,16 @@ export function ProgressTier({ points, role }: ProgressTierProps) {
         <div className="absolute -top-1 h-6 w-0.5 bg-gray-700/70 rounded" style={{ left: `${quotaPct}%` }} title={`Quota: ${quota} pts`} />
       </div>
 
-      {/* Labels under bar */}
-      <div className="flex text-[10px] text-gray-400 font-medium mb-4">
-        {bands.map((band) => (
-          <div key={band.label} style={{ width: `${band.widthPct}%` }} className="text-center leading-tight">
-            <div>{band.label}</div>
-            <div className="text-gray-500">{formatCurrency(band.rate)}</div>
+      {/* Scale + rate legend */}
+      <div className="flex justify-between text-[10px] text-gray-400 font-medium mb-2 tabular-nums">
+        <span>0</span>
+        <span>{displayMax} pts</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 text-[10px] font-medium mb-4">
+        {bands.map((band, i) => (
+          <div key={band.label} className="flex items-center justify-center gap-1 text-gray-500">
+            <span className={`w-2 h-2 rounded-full ${LEGEND_COLORS[i]}`} />
+            <span>{band.label}: {formatCurrency(band.rate)}</span>
           </div>
         ))}
       </div>

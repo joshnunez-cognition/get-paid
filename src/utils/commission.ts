@@ -6,6 +6,8 @@
 
 export type Role = 'sdr' | 'srSdr';
 
+export const MAX_POINTS = 200;
+
 export interface RolePlan {
   label: string;
   annualBase: number;
