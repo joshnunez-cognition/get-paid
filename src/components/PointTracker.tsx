@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from './Card';
+import { MAX_POINTS } from '../utils/commission';
 
 interface PointTrackerProps {
   points: number;
@@ -24,7 +25,7 @@ export function PointTracker({ points, quota, onPointsChange }: PointTrackerProp
   }, [points, quota]);
 
   const adjust = (delta: number) => {
-    const newVal = Math.max(0, Math.round((points + delta) * 10) / 10);
+    const newVal = Math.min(MAX_POINTS, Math.max(0, Math.round((points + delta) * 10) / 10));
     onPointsChange(newVal);
   };
 
@@ -36,7 +37,7 @@ export function PointTracker({ points, quota, onPointsChange }: PointTrackerProp
   const handleInputSubmit = () => {
     const val = parseFloat(inputValue);
     if (!isNaN(val) && val >= 0) {
-      onPointsChange(Math.round(val * 10) / 10);
+      onPointsChange(Math.min(MAX_POINTS, Math.round(val * 10) / 10));
     }
     setShowInput(false);
     setInputValue('');
@@ -76,6 +77,24 @@ export function PointTracker({ points, quota, onPointsChange }: PointTrackerProp
           </button>
         </div>
 
+        {/* Slider */}
+        <div className="mb-5 px-1">
+          <input
+            type="range"
+            min={0}
+            max={MAX_POINTS}
+            step={1}
+            value={points}
+            onChange={(e) => onPointsChange(Number(e.target.value))}
+            className="w-full h-2 cursor-pointer accent-brand-500 touch-pan-y"
+            aria-label="Monthly points"
+          />
+          <div className="flex justify-between text-[10px] text-gray-400 font-medium tabular-nums">
+            <span>0</span>
+            <span>{MAX_POINTS}</span>
+          </div>
+        </div>
+
         {/* Reset */}
         <div className="flex justify-center">
           <button
@@ -95,6 +114,7 @@ export function PointTracker({ points, quota, onPointsChange }: PointTrackerProp
                 type="number"
                 step="0.5"
                 min="0"
+                max={MAX_POINTS}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder={points.toString()}
