@@ -26,7 +26,7 @@ const MIN_DISPLAY = 70;
 
 // Bar scale grows with points (10% headroom, rounded up to 10) so it never pins full before MAX_POINTS
 function getDisplayMax(points: number): number {
-  return Math.min(MAX_POINTS, Math.max(MIN_DISPLAY, Math.ceil((points * 1.1) / 10) * 10));
+  return Math.min(MAX_POINTS, Math.max(MIN_DISPLAY, Math.ceil((points * 11) / 100) * 10));
 }
 
 export function ProgressTier({ points, role }: ProgressTierProps) {
